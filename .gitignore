@@ -6,6 +6,15 @@ __pycache__/
 # C extensions
 *.so
 
+# Indexes
+*.pkl
+*.faiss
+
+# Data
+*.pkl
+*.txt
+*.xlsx
+
 # Distribution / packaging
 .Python
 build/
