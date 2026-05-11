@@ -12,6 +12,7 @@ dependencies = [
     "google-generativeai",
     "numpy",
     "openai",
+    "openpyxl",
     "pandas",
     "pyclean>=3.6.0",
     "python-dotenv",
