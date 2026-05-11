@@ -10,6 +10,13 @@ import pandas as pd
 
 @dataclass
 class IndexData:
+    """Holds the FAISS index and metadata for one chat file.
+
+    Convention: user1 is the participant being simulated (the bot persona),
+    user2 is the human questioner. FAISS indexes user2's messages so we can
+    find semantically similar messages and fetch user1's replies.
+    """
+
     faiss_index: Any  # faiss.Index subtype (IndexFlatIP after normalization)
     texts: list[str]          # User2 messages, aligned with index rows
     row_indices: list[int]    # positional (iloc) indices in df for each User2 message

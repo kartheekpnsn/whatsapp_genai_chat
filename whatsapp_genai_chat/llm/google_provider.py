@@ -23,5 +23,8 @@ class GoogleEmbedding(EmbeddingProvider):
         self._genai = genai
 
     def embed(self, texts: list[str]) -> list[list[float]]:
-        result = self._genai.embed_content(model=self._model, content=texts)
-        return result["embedding"]
+        results = []
+        for text in texts:
+            result = self._genai.embed_content(model=self._model, content=text)
+            results.append(result["embedding"])
+        return results

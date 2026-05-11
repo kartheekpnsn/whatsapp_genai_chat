@@ -1,16 +1,15 @@
 import numpy as np
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import whatsapp_genai_chat.api.main as main_module
 from whatsapp_genai_chat.core.indexer import IndexData
 from whatsapp_genai_chat.core.retriever import search_and_fetch_replies
-from whatsapp_genai_chat.llm.factory import get_llm_provider, get_embedding_provider
 
 router = APIRouter()
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=2000)
 
 
 class ChatResponse(BaseModel):
@@ -25,6 +24,20 @@ def _require_index() -> IndexData:
     return idx
 
 
+def _require_embedding_provider():
+    ep = main_module.embedding_provider
+    if ep is None:
+        raise HTTPException(status_code=503, detail="Embedding provider not initialized.")
+    return ep
+
+
+def _require_llm_provider():
+    lp = main_module.llm_provider
+    if lp is None:
+        raise HTTPException(status_code=503, detail="LLM provider not initialized.")
+    return lp
+
+
 @router.get("/health")
 def health():
     idx = _require_index()
@@ -36,9 +49,11 @@ def chat(req: ChatRequest):
     idx = _require_index()
 
     try:
-        embedding_provider = get_embedding_provider()
+        embedding_provider = _require_embedding_provider()
         raw = embedding_provider.embed([req.message])
         query_embedding = np.array(raw, dtype="float32").reshape(1, -1)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Embedding provider error: {e}")
 
@@ -48,7 +63,7 @@ def chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail="No relevant responses found in index.")
 
     try:
-        llm_provider = get_llm_provider()
+        llm_provider = _require_llm_provider()
         system_prompt = (
             f"You are {idx.user1}. Based on how {idx.user1} has responded in the past, "
             f"reply in their exact style — including language mix (e.g. Telugu+English), tone, emoji usage, "
@@ -60,6 +75,8 @@ def chat(req: ChatRequest):
             + f"\n\nNow respond to this message from {idx.user2}: {req.message}"
         )
         reply = llm_provider.complete(system=system_prompt, user=user_prompt)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"LLM provider error: {e}")
 

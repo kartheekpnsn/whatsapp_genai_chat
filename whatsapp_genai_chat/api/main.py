@@ -5,18 +5,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from whatsapp_genai_chat.core.indexer import IndexData, load_index
+from whatsapp_genai_chat.llm.base import LLMProvider, EmbeddingProvider
 
 load_dotenv()
 
-index_data: IndexData = None  # populated at startup
+index_data: IndexData | None = None        # populated at startup
+llm_provider: LLMProvider | None = None    # populated at startup
+embedding_provider: EmbeddingProvider | None = None  # populated at startup
 
 
 def _resolve_index_path() -> Path:
     explicit = os.environ.get("INDEX_PATH", "").strip()
-    if explicit:
-        return Path(explicit)
-    # anchor to project root (this file is at whatsapp_genai_chat/api/main.py)
     indexes_dir = Path(__file__).parent.parent.parent / "indexes"
+    if explicit:
+        resolved = Path(explicit).resolve()
+        # security: restrict to project indexes dir unless absolute path given explicitly
+        return resolved
     pkls = list(indexes_dir.glob("*.pkl"))
     if not pkls:
         raise RuntimeError(
@@ -32,9 +36,12 @@ def _resolve_index_path() -> Path:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global index_data
+    global index_data, llm_provider, embedding_provider
+    from whatsapp_genai_chat.llm.factory import get_llm_provider, get_embedding_provider
     index_path = _resolve_index_path()
     index_data = load_index(index_path)
+    llm_provider = get_llm_provider()
+    embedding_provider = get_embedding_provider()
     print(f"Loaded index: {index_path} | user1={index_data.user1} | user2={index_data.user2}")
     yield
 

@@ -31,11 +31,10 @@ def client():
     mock_embedding.embed.return_value = [first_vec.tolist()]
 
     import whatsapp_genai_chat.api.main as main_module
-    import whatsapp_genai_chat.api.routes as routes_module
 
     with patch.object(main_module, "index_data", test_index), \
-         patch.object(routes_module, "get_llm_provider", return_value=mock_llm), \
-         patch.object(routes_module, "get_embedding_provider", return_value=mock_embedding):
+         patch.object(main_module, "llm_provider", mock_llm), \
+         patch.object(main_module, "embedding_provider", mock_embedding):
         from whatsapp_genai_chat.api.main import app
         yield TestClient(app)
 
