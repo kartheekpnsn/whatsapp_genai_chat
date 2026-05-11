@@ -13,6 +13,7 @@ dependencies = [
     "numpy",
     "openai",
     "pandas",
+    "pyclean>=3.6.0",
     "python-dotenv",
     "uvicorn[standard]",
     "whatsappchattodf>=0.1.3",
