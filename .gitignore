@@ -14,7 +14,6 @@ __pycache__/
 *.pkl
 *.txt
 *.xlsx
-*.lock
 
 # Distribution / packaging
 .Python
