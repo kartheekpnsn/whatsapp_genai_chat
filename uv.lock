@@ -918,6 +918,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyclean"
+version = "3.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/0d/7690e519b66101c41c114e2ddbf144f9b4ff6ea938fb199c09ed958f3970/pyclean-3.6.0.tar.gz", hash = "sha256:a46c179be187999d50d2d3362b2c94856e60f77de32ca7ec2db4eeb16bc39199", size = 27000, upload-time = "2026-03-30T17:34:30.509Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/2a/1797004bb000db555bd45e38550b3ca10699f87e22a78e6753882e0ac2cf/pyclean-3.6.0-py3-none-any.whl", hash = "sha256:3e5f9c83f2472df5bdafa78ed533bd38690756e0a7b3b6f11c8b29c9affc728b", size = 27750, upload-time = "2026-03-30T17:34:29.034Z" },
+]
+
+[[package]]
 name = "pycparser"
 version = "3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1421,6 +1430,7 @@ dependencies = [
     { name = "numpy" },
     { name = "openai" },
     { name = "pandas" },
+    { name = "pyclean" },
     { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "whatsappchattodf" },
@@ -1443,6 +1453,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "openai" },
     { name = "pandas" },
+    { name = "pyclean", specifier = ">=3.6.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "python-dotenv" },
     { name = "uvicorn", extras = ["standard"] },
