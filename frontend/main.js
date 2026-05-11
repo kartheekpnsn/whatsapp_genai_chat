@@ -10,6 +10,7 @@ let sending = false;
 async function init() {
   try {
     const res = await fetch(`${API}/health`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     headerName.textContent = data.user1;
   } catch {
@@ -45,6 +46,7 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     typing.remove();
     addBubble(data.reply, 'bot');

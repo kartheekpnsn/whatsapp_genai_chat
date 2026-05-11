@@ -103,3 +103,5 @@ body {
 }
 
 #send-btn:hover { background: #128c7e; }
+#send-btn:disabled { background: #ccc; cursor: not-allowed; }
+#msg-input:disabled { opacity: 0.6; }
