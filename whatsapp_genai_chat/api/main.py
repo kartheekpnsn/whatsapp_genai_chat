@@ -1,7 +1,10 @@
+import logging
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from whatsapp_genai_chat.core.indexer import IndexData, load_index

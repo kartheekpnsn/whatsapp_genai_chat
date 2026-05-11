@@ -31,6 +31,12 @@ def main():
     print(f"Parsing {chat_path}...")
     df = parse_chat(chat_path)
 
+    excel_dir = Path(__file__).parent.parent / "data" / "excel"
+    excel_dir.mkdir(parents=True, exist_ok=True)
+    excel_path = excel_dir / f"{chat_path.stem}.xlsx"
+    df.to_excel(excel_path, index=False)
+    print(f"Chat data written to {excel_path}")
+
     senders = df["sender"].dropna().unique().tolist()
     if len(senders) != 2:
         print(f"Error: expected 2 users, found {len(senders)}: {senders}")
