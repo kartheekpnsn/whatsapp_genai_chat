@@ -1,8 +1,12 @@
-.PHONY: dev backend frontend index
+SHELL := /bin/bash
+.PHONY: dev backend frontend index help
 
-dev: ## Run backend and frontend concurrently
+help: ## Show available targets
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
+
+dev: ## Run backend and frontend concurrently (Ctrl-C to stop both)
 	@echo "Starting backend on :8003 and frontend on :5174 ..."
-	@trap 'kill 0' INT; \
+	@trap 'kill 0' INT TERM EXIT; \
 	uv run uvicorn whatsapp_genai_chat.api.main:app --port 8003 --reload & \
 	cd frontend && npm run dev -- --port 5174; \
 	wait
@@ -18,4 +22,4 @@ index: ## Build FAISS index. Usage: make index FILE=data/chat-sample.txt
 		echo "Usage: make index FILE=data/chat-sample.txt"; \
 		exit 1; \
 	fi
-	uv run scripts/build_index.py $(FILE)
+	uv run scripts/build_index.py "$(FILE)"
