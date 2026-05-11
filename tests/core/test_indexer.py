@@ -18,6 +18,21 @@ def test_build_index_returns_index_data():
     assert idx.user1 == "Alice"
     assert idx.user2 == "Bob"
     assert len(idx.texts) == 10
+    assert idx.row_indices == []  # no DataFrame provided
+
+
+def test_build_index_row_indices_with_dataframe():
+    import pandas as pd
+    texts = ["hello", "goodbye"]
+    df = pd.DataFrame([
+        {"sender": "Bob", "message": "hello"},
+        {"sender": "Alice", "message": "hi"},
+        {"sender": "Bob", "message": "goodbye"},
+        {"sender": "Alice", "message": "bye"},
+    ])
+    embeddings = make_fake_embeddings(2, dim=8)
+    idx = build_index(texts=texts, embeddings=embeddings, user1="Alice", user2="Bob", df=df)
+    assert idx.row_indices == [0, 2]
 
 
 def test_save_and_load_roundtrip(tmp_path):

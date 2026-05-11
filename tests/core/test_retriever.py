@@ -40,6 +40,30 @@ def test_search_respects_k():
     assert len(replies) <= 2
 
 
+def test_search_works_with_unnormalized_query():
+    idx = make_index()
+    # deliberately un-normalized query — should still work correctly now
+    query_embedding = np.ones((1, 4), dtype="float32") * 5.0  # large magnitude
+    replies = search_and_fetch_replies(idx, query_embedding, k=3)
+    assert isinstance(replies, list)
+
+
+def test_search_handles_no_reply():
+    # DataFrame where User2 sends the last message with no User1 reply after
+    df = pd.DataFrame([
+        {"sender": "Bob", "message": "hello"},
+        {"sender": "Alice", "message": "hi there"},
+        {"sender": "Bob", "message": "goodbye"},  # last message, no User1 reply
+    ])
+    dim = 4
+    embeddings = np.random.rand(2, dim).astype("float32")
+    idx = build_index(texts=["hello", "goodbye"], embeddings=embeddings, user1="Alice", user2="Bob", df=df)
+    query = np.random.rand(1, dim).astype("float32")
+    # should not crash, may return fewer or zero replies for the last-message match
+    replies = search_and_fetch_replies(idx, query, k=2)
+    assert isinstance(replies, list)
+
+
 def test_search_returns_user1_not_user2_messages():
     idx = make_index()
     query_embedding = np.random.rand(1, 4).astype("float32")

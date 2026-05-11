@@ -12,6 +12,7 @@ import pandas as pd
 class IndexData:
     faiss_index: Any  # faiss.Index subtype (IndexFlatIP after normalization)
     texts: list[str]          # User2 messages, aligned with index rows
+    row_indices: list[int]    # positional (iloc) indices in df for each User2 message
     user1: str
     user2: str
     df: pd.DataFrame          # full chat DataFrame
@@ -32,17 +33,27 @@ def build_index(
         raise ValueError(
             f"texts length ({len(texts)}) must match embeddings row count ({embeddings.shape[0]})"
         )
+    actual_df = df.reset_index(drop=True) if df is not None else pd.DataFrame()
+
+    # compute positional indices for each text in the DataFrame
+    row_indices: list[int] = []
+    if not actual_df.empty and user2:
+        user2_positions = actual_df.index[actual_df["sender"] == user2].tolist()
+        # align: texts[i] corresponds to user2_positions[i] (same order)
+        row_indices = user2_positions[: len(texts)]
+
     dim = embeddings.shape[1]
-    embeddings = embeddings.copy()  # don't mutate caller's array
+    embeddings = embeddings.copy()
     faiss.normalize_L2(embeddings)
     index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
     return IndexData(
         faiss_index=index,
         texts=texts,
+        row_indices=row_indices,
         user1=user1,
         user2=user2,
-        df=df if df is not None else pd.DataFrame(),
+        df=actual_df,
     )
 
 
