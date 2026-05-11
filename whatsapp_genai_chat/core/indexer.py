@@ -1,0 +1,51 @@
+import pickle
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import faiss
+import numpy as np
+import pandas as pd
+
+
+@dataclass
+class IndexData:
+    faiss_index: Any
+    texts: list[str]          # User2 messages, aligned with index rows
+    user1: str
+    user2: str
+    df: pd.DataFrame          # full chat DataFrame
+
+
+def build_index(
+    texts: list[str],
+    embeddings: np.ndarray,
+    user1: str,
+    user2: str,
+    df: pd.DataFrame | None = None,
+) -> IndexData:
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dim)
+    index.add(embeddings)
+    return IndexData(
+        faiss_index=index,
+        texts=texts,
+        user1=user1,
+        user2=user2,
+        df=df if df is not None else pd.DataFrame(),
+    )
+
+
+def save_index(data: IndexData, path: Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        pickle.dump(data, f)
+
+
+def load_index(path: Path) -> IndexData:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Index not found: {path}")
+    with open(path, "rb") as f:
+        return pickle.load(f)
