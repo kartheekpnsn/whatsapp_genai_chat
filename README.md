@@ -4,71 +4,146 @@ Chat with an AI that responds like one participant from a WhatsApp export.
 
 The app parses a two-person WhatsApp `.txt` export, builds a local FAISS index over one participant's messages, retrieves similar historical turns for a new message, and asks an LLM to synthesize a reply in the selected participant's style. It includes a FastAPI backend and a small WhatsApp-like Vite frontend.
 
+## Quick Start
+
+```bash
+# Install dependencies
+uv sync --extra dev
+cd frontend && npm install && cd ..
+
+# Prepare configuration
+cp .env.example .env
+# Edit .env with your provider (azure_openai, openai, google, or anthropic)
+
+# Build index from a WhatsApp export
+make index FILE=data/chat-sample.txt
+
+# Run the app
+make dev
+```
+
+Open [http://localhost:5174](http://localhost:5174) in your browser.
+
 ## Features
 
-- Parse WhatsApp text exports with `whatsappchattodf`
-- Select which of the two chat participants the bot should imitate
-- Build and persist a local FAISS vector index as a `.pkl` file
-- Retrieve semantically similar messages and the selected participant's follow-up replies
-- Generate persona-style responses with Azure OpenAI, OpenAI, Google Gemini, or Anthropic LLMs
-- Run a local FastAPI API on port `8003`
-- Run a Vite frontend on port `5174`
-- Use one `Makefile` to build indexes and run the full app
+- **Multi-provider LLM support**: Azure OpenAI, OpenAI, Google Gemini, or Anthropic
+- **Local vector search**: FAISS-based semantic indexing of historical messages
+- **Persona imitation**: Bot learns and mimics one participant's communication style
+- **Efficient retrieval**: Fetches similar messages and follow-up replies as style examples
+- **Full-stack application**: FastAPI backend + Vite frontend included
+- **One-command workflows**: Makefile simplifies building indexes and running the app
+
+## System Architecture
+
+```mermaid
+graph TB
+    subgraph Input["Input Layer"]
+        WhatsApp["WhatsApp Export<br/>.txt file"]
+    end
+    
+    subgraph Processing["Processing Pipeline"]
+        Parser["Parser<br/>whatsappchattodf"]
+        Embeddings["Embeddings<br/>text-embedding-3-large"]
+        FAISS["FAISS Index<br/>Local Vector DB"]
+    end
+    
+    subgraph Runtime["Runtime Layer"]
+        API["FastAPI Backend<br/>:8003"]
+        Frontend["Vite Frontend<br/>:5174"]
+        LLM["LLM Provider<br/>Generates Reply"]
+    end
+    
+    WhatsApp -->|Parse| Parser
+    Parser -->|Embed Other User| Embeddings
+    Embeddings -->|Store| FAISS
+    
+    Frontend -->|User Message| API
+    API -->|Embed & Search| FAISS
+    FAISS -->|Retrieve Similar| API
+    API -->|Example Replies| LLM
+    LLM -->|Generated Response| API
+    API -->|Chat Reply| Frontend
+```
+
+## Workflow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User as User<br/>(Web UI)
+    participant Backend as Backend<br/>(FastAPI)
+    participant Index as FAISS<br/>Index
+    participant Provider as LLM<br/>Provider
+    
+    User->>Backend: POST /chat (new message)
+    Backend->>Backend: Embed message
+    Backend->>Index: Search semantic matches
+    Index-->>Backend: Top-K similar messages + replies
+    Backend->>Provider: Generate reply (with examples)
+    Provider-->>Backend: Generated response
+    Backend-->>User: POST /chat response
+```
 
 ## How It Works
 
-1. A WhatsApp export is parsed into a dataframe with normalized `sender` and `message` columns.
-2. During indexing, you choose the participant to simulate.
-3. The app embeds the other participant's messages and stores them in a FAISS index.
-4. At chat time, your message is embedded and searched against that index.
-5. For the top matches, the app fetches the simulated participant's immediate replies from the original chat.
-6. The configured LLM receives those replies as style examples and writes a new response.
+1. **Indexing Phase**: A WhatsApp export is parsed into a dataframe with `sender` and `message` columns. You choose which participant the bot will simulate. The *other* participant's messages are embedded and stored in a FAISS index.
 
-In the code, `user1` is the participant being simulated by the bot, and `user2` is the human user.
+2. **Chat Phase**: When you send a message, the backend embeds it and searches the FAISS index for semantically similar historical messages. For each match, it retrieves that participant's immediate follow-up replies as style examples.
+
+3. **Response Generation**: The configured LLM receives those replies as context and generates a new response in the simulated participant's style.
+
+**Terminology**: In the codebase, `user1` is the participant being simulated by the bot, and `user2` is the human user interacting with the chat interface.
+
+## Requirements
+
+- **Python**: `>=3.12` (recommended for best FAISS wheel availability)
+- **Node.js & npm**: For the Vite frontend
+- **uv**: Python environment and package manager
+- **WhatsApp export**: A two-person chat as `.txt` file
+- **LLM access**: At least one supported provider (see [Provider Configuration](#provider-configuration))
 
 ## Project Structure
 
 ```text
 .
-├── frontend/                       # Vite frontend
+├── frontend/                       # Vite React UI
 │   ├── index.html
 │   ├── main.js
-│   └── style.css
-├── scripts/
-│   └── build_index.py              # Interactive FAISS index builder
-├── tests/                          # Unit and API tests
+│   ├── style.css
+│   └── vite.config.js
 ├── whatsapp_genai_chat/
-│   ├── api/                        # FastAPI app and routes
-│   ├── core/                       # Parser, indexer, retriever
-│   └── llm/                        # Provider interfaces and implementations
-├── data/                           # Local WhatsApp exports
-├── indexes/                        # Generated FAISS pickle indexes
-├── Makefile
-├── pyproject.toml
-└── REQUIREMENT.md
+│   ├── api/
+│   │   ├── main.py                 # FastAPI application
+│   │   └── routes.py               # API endpoints
+│   ├── core/
+│   │   ├── parser.py               # WhatsApp export parser
+│   │   ├── indexer.py              # FAISS index builder
+│   │   └── retriever.py            # Semantic search & retrieval
+│   └── llm/
+│       ├── base.py                 # Provider interface
+│       ├── factory.py              # Provider factory
+│       └── *_provider.py           # Provider implementations
+├── scripts/
+│   └── build_index.py              # Interactive index building script
+├── tests/                          # Unit & API tests
+├── data/                           # WhatsApp exports (gitignored)
+├── indexes/                        # FAISS pickle files (gitignored)
+├── Makefile                        # Build & run commands
+├── pyproject.toml                  # Python dependencies
+├── requirements.txt
+└── README.md
 ```
 
-`data/*.txt`, generated indexes, `.env`, and other local artifacts are ignored by git so private chats and credentials do not get committed.
+**Important**: `data/`, `indexes/`, `.env`, and other local artifacts are in `.gitignore` to keep private chats and credentials secure.
 
-## Requirements
+## Setup & Installation
 
-- Python `>=3.12`
-- `uv` for Python environment and package management
-- Node.js and npm for the Vite frontend
-- A two-person WhatsApp chat export as `.txt`
-- Access to at least one supported LLM and embedding provider
-
-Python 3.12 is recommended for the smoothest FAISS wheel availability.
-
-## Setup
-
-Install Python dependencies:
+### 1. Install Python Dependencies
 
 ```bash
 uv sync --extra dev
 ```
 
-Install frontend dependencies:
+### 2. Install Frontend Dependencies
 
 ```bash
 cd frontend
@@ -76,32 +151,32 @@ npm install
 cd ..
 ```
 
-Create your local environment file:
+### 3. Create Environment Configuration
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env` for the provider you want to use.
+Edit `.env` to select your provider and add credentials. See [Provider Configuration](#provider-configuration) for detailed setup for each provider.
 
 ## Provider Configuration
 
-Select the active provider with:
+Select your LLM and embedding provider by setting the `PROVIDER` variable:
 
 ```env
-PROVIDER=azure_openai
+PROVIDER=azure_openai  # or: openai, google, anthropic
 ```
 
-Supported values:
+### Supported Providers
 
-| Provider | LLM | Embeddings | Notes |
-| --- | --- | --- | --- |
-| `azure_openai` | Yes | Yes | Uses `DefaultAzureCredential`; no API key required |
-| `openai` | Yes | Yes | Uses `OPENAI_API_KEY` |
-| `google` | Yes | Yes | Uses `GOOGLE_API_KEY` |
-| `anthropic` | Yes | No | Anthropic embeddings are not implemented |
+| Provider | LLM | Embeddings | Auth | Notes |
+|----------|-----|-----------|------|-------|
+| `azure_openai` | ✅ | ✅ | `DefaultAzureCredential` | No API key needed; use `az login` |
+| `openai` | ✅ | ✅ | `OPENAI_API_KEY` | Full-featured, widely used |
+| `google` | ✅ | ✅ | `GOOGLE_API_KEY` | Gemini models available |
+| `anthropic` | ✅ | ❌ | `ANTHROPIC_API_KEY` | Cannot build indexes alone; use for LLM-only |
 
-Because the current factory uses the same `PROVIDER` for both LLMs and embeddings, `PROVIDER=anthropic` cannot build an index or answer chat requests by itself.
+**Note**: Because the factory uses the same `PROVIDER` for both LLMs and embeddings, `PROVIDER=anthropic` cannot build an index or run the full app independently. Use `azure_openai`, `openai`, or `google` for indexing.
 
 ### Azure OpenAI
 
@@ -113,7 +188,7 @@ AZURE_LLM_DEPLOYMENT_NAME=gpt-4.1
 AZURE_EMBEDDING_DEPLOYMENT_NAME=text-embedding-3-large
 ```
 
-Azure authentication uses `DefaultAzureCredential`, so authenticate locally with a supported Azure identity method, for example:
+**Authentication**: Uses `DefaultAzureCredential`. Log in locally:
 
 ```bash
 az login
@@ -128,6 +203,8 @@ OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-large
 ```
 
+Get your API key from [platform.openai.com](https://platform.openai.com).
+
 ### Google
 
 ```env
@@ -136,6 +213,8 @@ GOOGLE_API_KEY=...
 GOOGLE_MODEL=gemini-2.0-flash
 GOOGLE_EMBEDDING_MODEL=models/text-embedding-004
 ```
+
+Get your API key from [Google AI Studio](https://aistudio.google.com/apikey).
 
 ### Anthropic
 
@@ -146,92 +225,74 @@ ANTHROPIC_MODEL=claude-sonnet-4-6
 ANTHROPIC_MAX_TOKENS=2048
 ```
 
-Anthropic can generate replies, but this project does not currently provide a separate embedding-provider setting. Use `azure_openai`, `openai`, or `google` when building indexes or running the app.
+Get your API key from [console.anthropic.com](https://console.anthropic.com). Note: Anthropic generates replies but cannot provide embeddings for indexing.
 
-## Prepare a WhatsApp Export
+## Usage Guide
 
-Export a two-person chat from WhatsApp as a `.txt` file and place it under `data/`.
+### Step 1: Prepare a WhatsApp Export
 
-Example:
+1. Export a **two-person chat** from WhatsApp as a `.txt` file
+2. Save it in the `data/` directory
 
-```text
-data/chat-sample.txt
-```
+Example: `data/chat-sample.txt`
 
-The parser expects `whatsappchattodf` to return at least these columns:
+The parser uses `whatsappchattodf` and expects these columns:
+- `User` → normalized to `sender`
+- `Message` → normalized to `message`
 
-- `User`
-- `Message`
+### Step 2: Build an Index
 
-They are normalized internally to:
-
-- `sender`
-- `message`
-
-## Build an Index
-
-Run:
+Run the interactive index builder:
 
 ```bash
 make index FILE=data/chat-sample.txt
 ```
 
-The script will:
+**What happens:**
+1. Parses the chat export
+2. Verifies exactly two senders exist
+3. Asks which participant to simulate
+4. Embeds the other participant's messages in batches
+5. Saves the FAISS index to `indexes/<chat-file-stem>.pkl`
 
-1. Parse the chat export.
-2. Confirm there are exactly two senders.
-3. Ask which user the bot should simulate.
-4. Embed the other user's messages in batches.
-5. Save the generated index to `indexes/<chat-file-stem>.pkl`.
-
-If more than one `.pkl` exists in `indexes/`, set `INDEX_PATH` in `.env`:
+**Managing multiple indexes**: If you have multiple `.pkl` files in `indexes/`, set `INDEX_PATH` in `.env`:
 
 ```env
 INDEX_PATH=/absolute/path/to/indexes/chat-sample.pkl
 ```
 
-Relative paths work too, but absolute paths are clearer when switching between multiple indexes.
+### Step 3: Run the Application
 
-## Run the App
-
-Start backend and frontend together:
+Start both backend and frontend:
 
 ```bash
 make dev
 ```
 
-To run the app with a specific index for this session, pass `FILE`:
+Or run them separately:
+
+```bash
+make backend  # FastAPI on :8003
+make frontend # Vite on :5174
+```
+
+**To use a specific index for this session:**
 
 ```bash
 make dev FILE=indexes/chat-sample.pkl
 ```
 
-This starts:
+**Access the UI**: Open [http://localhost:5174](http://localhost:5174)
 
-- FastAPI backend: `http://localhost:8003`
-- Vite frontend: `http://localhost:5174`
+## API Reference
 
-Run them separately if needed:
+The backend runs on port `8003` and exposes two endpoints:
 
-```bash
-make backend
-make frontend
-```
-
-Open the frontend at:
-
-```text
-http://localhost:5174
-```
-
-## API
-
-### `GET /health`
+### GET `/health`
 
 Returns the loaded index status and participant names.
 
-Example response:
-
+**Response:**
 ```json
 {
   "status": "ok",
@@ -240,18 +301,18 @@ Example response:
 }
 ```
 
-### `POST /chat`
+### POST `/chat`
 
-Request:
+Generates a reply based on the user's message and historical style examples.
 
+**Request:**
 ```json
 {
   "message": "hello there"
 }
 ```
 
-Response:
-
+**Response:**
 ```json
 {
   "reply": "Hey! I'm good.",
@@ -259,113 +320,144 @@ Response:
 }
 ```
 
-The `message` field is required and is limited to 2,000 characters.
+**Constraints:**
+- `message` field is required
+- Limited to 2,000 characters
 
-## Make Targets
+## Development
 
-```bash
-make help
-```
+### Make Targets
 
-Available targets:
+Run `make help` to see all available targets:
 
 | Target | Description |
-| --- | --- |
+|--------|-------------|
 | `make dev` | Run backend and frontend together |
-| `make dev FILE=indexes/chat-sample.pkl` | Run backend and frontend with a specific index for this session |
-| `make backend` | Run FastAPI on port `8003` |
-| `make frontend` | Run Vite on port `5174` |
-| `make index FILE=data/chat-sample.txt` | Build a FAISS index from a WhatsApp export |
-| `make help` | Show available targets |
+| `make dev FILE=indexes/chat.pkl` | Run app with a specific index |
+| `make backend` | Run FastAPI backend on port 8003 |
+| `make frontend` | Run Vite frontend on port 5174 |
+| `make index FILE=data/chat.txt` | Build a FAISS index from WhatsApp export |
+| `make help` | Show all available targets |
 
-## Testing
+### Running Tests
 
-Run the test suite:
+Execute the test suite:
 
 ```bash
 uv run pytest
 ```
 
-The tests cover:
-
-- WhatsApp parsing
+**Test coverage:**
+- WhatsApp export parsing
 - FAISS index construction and persistence
-- Reply retrieval from matched chat turns
+- Message retrieval and ranking
 - FastAPI route behavior
-- Provider factory behavior
+- LLM provider factory
+- Edge cases and error handling
 
 ## Troubleshooting
 
-### No index found
+### Index Issues
 
-If the backend fails with:
+#### No index found in indexes/
 
-```text
+**Error:**
+```
 No index found in indexes/
 ```
 
-build an index first:
-
+**Solution**: Build an index first:
 ```bash
 make index FILE=data/chat-sample.txt
 ```
 
-### Multiple indexes found
+#### Multiple indexes found
 
-If there are multiple `.pkl` files in `indexes/`, set:
-
+**Solution**: Specify which index to use via `.env`:
 ```env
 INDEX_PATH=/absolute/path/to/the-index.pkl
 ```
 
-Or pass the index directly when running the full app:
-
+Or pass it directly when running:
 ```bash
 make dev FILE=indexes/chat-sample.pkl
 ```
 
-### Backend offline in the frontend
+### Connection Issues
 
-The frontend calls `http://localhost:8003`. Make sure the backend is running:
+#### Backend offline in the frontend
 
+**Cause**: Frontend can't reach the backend at `http://localhost:8003`
+
+**Solution**: Ensure the backend is running:
 ```bash
 make backend
 ```
 
-### CORS issues
+#### CORS errors
 
-By default, the backend allows `http://localhost:5174`. Override with:
+**Error**: Cross-origin requests blocked in browser
 
+**Solution**: Verify CORS origins in `.env`:
 ```env
 CORS_ORIGINS=http://localhost:5174,http://127.0.0.1:5174
 ```
 
-### Azure authentication errors
+Override if needed for different hosts or ports.
 
-Make sure you are logged in and have access to the Azure OpenAI resource:
+### Provider & Authentication Issues
 
+#### Azure authentication errors
+
+**Cause**: Not authenticated or no access to the Azure OpenAI resource
+
+**Solutions**:
 ```bash
+# Authenticate with Azure
 az login
+
+# Verify deployment names match your resource
+# (Check .env against Azure portal)
 ```
 
-Also confirm that deployment names in `.env` match the deployments in Azure OpenAI.
+#### Missing FAISS or parser dependencies
 
-### Missing FAISS or parser dependencies
-
-Install or refresh the Python environment:
-
+**Solution**: Reinstall the environment:
 ```bash
 uv sync --extra dev
 ```
 
-If FAISS wheels are unavailable for your Python version or platform, try Python 3.12.
+If FAISS wheels are unavailable for your Python version, try Python 3.12:
+```bash
+python3.12 -m venv venv
+source venv/bin/activate
+uv sync --extra dev
+```
 
-## Privacy Notes
+## Privacy & Security
 
-WhatsApp exports are private personal data. Keep raw chat files in `data/`, keep generated indexes in `indexes/`, and do not commit `.env`, `.txt`, `.pkl`, or generated local artifacts.
+### Data Handling
 
-The app sends retrieved message examples and your current prompt to the configured LLM provider. Review your provider's data handling policy before using real personal chats.
+- **WhatsApp exports** are private personal data. Keep them in `data/` which is gitignored.
+- **Generated indexes** are stored in `indexes/` which is gitignored.
+- **Credentials** are in `.env` which is gitignored.
+- **Do not commit**: `.txt` files, `.pkl` indexes, `.env`, or other local artifacts.
+
+### LLM Provider Privacy
+
+The app sends to your configured LLM provider:
+- Retrieved message examples from the chat history
+- Your current chat prompt
+- Generated responses
+
+**Before using real personal chats**, review your provider's privacy policy:
+- [OpenAI Privacy Policy](https://openai.com/privacy)
+- [Google AI Privacy Policy](https://policies.google.com/privacy)
+- [Anthropic Privacy Policy](https://www.anthropic.com/privacy)
+- [Microsoft Privacy (Azure)](https://privacy.microsoft.com/)
+
+Consider using sample or anonymized chat data for testing first.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE) for details.
