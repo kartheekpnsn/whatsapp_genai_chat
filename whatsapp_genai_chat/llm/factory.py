@@ -1,5 +1,6 @@
 import os
 import importlib
+from typing import Literal
 from dotenv import load_dotenv
 from whatsapp_genai_chat.llm.base import EmbeddingProvider, LLMProvider
 
@@ -36,19 +37,19 @@ def _provider() -> str:
     return os.environ.get("PROVIDER", "azure_openai").lower()
 
 
-def _resolve(class_index: int):
+def _resolve(kind: Literal["llm", "embedding"]):
     p = _provider()
     if p not in _REGISTRY:
         raise ValueError(f"Unknown provider: '{p}'. Must be one of: {_VALID}")
     module_path, llm_cls, emb_cls = _REGISTRY[p]
-    cls_name = llm_cls if class_index == 0 else emb_cls
+    cls_name = llm_cls if kind == "llm" else emb_cls
     module = importlib.import_module(module_path)
     return getattr(module, cls_name)()
 
 
 def get_llm_provider() -> LLMProvider:
-    return _resolve(0)
+    return _resolve("llm")
 
 
 def get_embedding_provider() -> EmbeddingProvider:
-    return _resolve(1)
+    return _resolve("embedding")

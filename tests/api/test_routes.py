@@ -7,6 +7,7 @@ from whatsapp_genai_chat.core.indexer import IndexData, build_index
 
 
 def make_test_index() -> IndexData:
+    np.random.seed(42)
     user2_msgs = ["hello", "how are you", "what did you eat"]
     user1_replies = ["hey!", "I'm good", "I had rice"]
     rows = []
@@ -24,7 +25,10 @@ def client():
     mock_llm = MagicMock()
     mock_llm.complete.return_value = "Hey! I'm good."
     mock_embedding = MagicMock()
-    mock_embedding.embed.return_value = [np.random.rand(4).tolist()]
+    # return an embedding identical to index row 0 — guaranteed FAISS hit
+    first_vec = np.ones(4, dtype="float32")
+    first_vec /= np.linalg.norm(first_vec)
+    mock_embedding.embed.return_value = [first_vec.tolist()]
 
     import whatsapp_genai_chat.api.main as main_module
     import whatsapp_genai_chat.api.routes as routes_module
@@ -57,3 +61,12 @@ def test_chat_returns_reply(client):
 def test_chat_requires_message_field(client):
     response = client.post("/chat", json={})
     assert response.status_code == 422
+
+
+def test_health_returns_503_when_index_not_loaded():
+    import whatsapp_genai_chat.api.main as main_module
+    with patch.object(main_module, "index_data", None):
+        from whatsapp_genai_chat.api.main import app
+        client = TestClient(app, raise_server_exceptions=False)
+        response = client.get("/health")
+        assert response.status_code == 503
