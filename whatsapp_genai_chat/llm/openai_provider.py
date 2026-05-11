@@ -1,10 +1,10 @@
 import os
-from openai import OpenAI
 from whatsapp_genai_chat.llm.base import EmbeddingProvider, LLMProvider
 
 
 class OpenAIEmbedding(EmbeddingProvider):
     def __init__(self):
+        from openai import OpenAI
         self._client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
         self._model = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-large")
 
@@ -15,6 +15,7 @@ class OpenAIEmbedding(EmbeddingProvider):
 
 class OpenAILLM(LLMProvider):
     def __init__(self):
+        from openai import OpenAI
         self._client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
         self._model = os.environ.get("OPENAI_MODEL", "gpt-4o")
 

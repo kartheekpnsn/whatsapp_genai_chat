@@ -1,10 +1,10 @@
 import os
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from openai import AzureOpenAI
 from whatsapp_genai_chat.llm.base import EmbeddingProvider, LLMProvider
 
 
-def _make_client() -> AzureOpenAI:
+def _make_client():
+    from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+    from openai import AzureOpenAI
     credential = DefaultAzureCredential()
     token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
     return AzureOpenAI(
