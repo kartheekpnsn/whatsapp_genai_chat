@@ -10,7 +10,7 @@ import pandas as pd
 
 @dataclass
 class IndexData:
-    faiss_index: Any
+    faiss_index: Any  # faiss.Index subtype (IndexFlatIP after normalization)
     texts: list[str]          # User2 messages, aligned with index rows
     user1: str
     user2: str
@@ -24,8 +24,18 @@ def build_index(
     user2: str,
     df: pd.DataFrame | None = None,
 ) -> IndexData:
+    if len(texts) == 0:
+        raise ValueError("texts must not be empty")
+    if embeddings.ndim != 2:
+        raise ValueError(f"embeddings must be a 2-D array, got shape {embeddings.shape}")
+    if len(texts) != embeddings.shape[0]:
+        raise ValueError(
+            f"texts length ({len(texts)}) must match embeddings row count ({embeddings.shape[0]})"
+        )
     dim = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dim)
+    embeddings = embeddings.copy()  # don't mutate caller's array
+    faiss.normalize_L2(embeddings)
+    index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
     return IndexData(
         faiss_index=index,
