@@ -34,7 +34,8 @@ def client():
 
     with patch.object(main_module, "index_data", test_index), \
          patch.object(main_module, "llm_provider", mock_llm), \
-         patch.object(main_module, "embedding_provider", mock_embedding):
+         patch.object(main_module, "embedding_provider", mock_embedding), \
+         patch.object(main_module, "memory_store", None):
         from whatsapp_genai_chat.api.main import app
         yield TestClient(app)
 
@@ -69,3 +70,49 @@ def test_health_returns_503_when_index_not_loaded():
         client = TestClient(app, raise_server_exceptions=False)
         response = client.get("/health")
         assert response.status_code == 503
+
+
+def test_chat_injects_memory_into_prompt(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import patch, MagicMock
+    import whatsapp_genai_chat.api.main as main_module
+    from whatsapp_genai_chat.core.memory import MemoryStore
+
+    test_index = make_test_index()
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = "Nice to hear!"
+    mock_embedding = MagicMock()
+    first_vec = __import__("numpy").ones(4, dtype="float32")
+    first_vec /= __import__("numpy").linalg.norm(first_vec)
+    mock_embedding.embed.return_value = [first_vec.tolist()]
+
+    # pre-populate memory CSV with one recent turn
+    csv_path = tmp_path / "memory.csv"
+    import csv as _csv
+    now = datetime.now(timezone.utc)
+    with csv_path.open("w", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=["timestamp", "query", "response"])
+        w.writeheader()
+        w.writerow({
+            "timestamp": (now - timedelta(minutes=5)).isoformat(),
+            "query": "previous question",
+            "response": "previous answer",
+        })
+
+    mock_memory = MemoryStore(csv_path, window_minutes=30)
+
+    with patch.object(main_module, "index_data", test_index), \
+         patch.object(main_module, "llm_provider", mock_llm), \
+         patch.object(main_module, "embedding_provider", mock_embedding), \
+         patch.object(main_module, "memory_store", mock_memory):
+        from whatsapp_genai_chat.api.main import app
+        from fastapi.testclient import TestClient
+        client = TestClient(app)
+        response = client.post("/chat", json={"message": "new question"})
+
+    assert response.status_code == 200
+    call_args = mock_llm.complete.call_args
+    user_prompt = call_args.kwargs.get("user") or call_args.args[1]
+    assert "Recent conversation history" in user_prompt
+    assert "previous question" in user_prompt
+    assert "previous answer" in user_prompt

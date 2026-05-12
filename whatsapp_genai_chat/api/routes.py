@@ -41,6 +41,10 @@ def _require_llm_provider():
     return lp
 
 
+def _get_memory_store():
+    return main_module.memory_store  # may be None — memory is non-critical
+
+
 @router.get("/health")
 def health():
     idx = _require_index()
@@ -62,6 +66,14 @@ def chat(req: ChatRequest):
 
     replies = search_and_fetch_replies(idx, query_embedding, k=3)
     logger.info("LLM context — %d reply examples fed in:\n%s", len(replies), "\n".join(f"  [{i+1}] {r}" for i, r in enumerate(replies)))
+
+    recent_turns = []
+    ms = _get_memory_store()
+    if ms is not None:
+        try:
+            recent_turns = ms.load_recent()
+        except Exception:
+            logger.warning("Failed to load memory", exc_info=True)
 
     if not replies:
         raise HTTPException(status_code=500, detail="No relevant responses found in index.")
@@ -92,9 +104,18 @@ def chat(req: ChatRequest):
             f"emotional context (e.g. 😂 for playful, 🥺 for affectionate, 😤 for annoyed). Never add emoji "
             f"types {idx.user1} doesn't use."
         )
+        memory_block = ""
+        if recent_turns:
+            lines = []
+            for turn in recent_turns:
+                lines.append(f"- {idx.user2}: {turn['query']}")
+                lines.append(f"  {idx.user1}: {turn['response']}")
+            memory_block = "\nRecent conversation history (most recent last):\n" + "\n".join(lines) + "\n"
+
         user_prompt = (
             f"Here are past responses from {idx.user1} in similar contexts:\n"
             + "\n".join(f"- {r}" for r in replies)
+            + memory_block
             + f"\n\nUsing only the above responses as your answer source, reply to this message from {idx.user2}: {req.message}"
         )
         reply = llm_provider.complete(system=system_prompt, user=user_prompt)
@@ -102,5 +123,12 @@ def chat(req: ChatRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"LLM provider error: {e}")
+
+    ms = _get_memory_store()
+    if ms is not None:
+        try:
+            ms.append(req.message, reply)
+        except Exception:
+            logger.warning("Failed to append to memory", exc_info=True)
 
     return ChatResponse(reply=reply, user1=idx.user1)
