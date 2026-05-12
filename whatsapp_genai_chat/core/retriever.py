@@ -35,9 +35,12 @@ def search_and_fetch_replies(index_data: IndexData, query_embedding: np.ndarray,
         while j < len(df) and df.iloc[j]["sender"] == user2:
             j += 1
         # collect consecutive user1 messages
+        _tmp_replies: list[str] = []
         while j < len(df) and df.iloc[j]["sender"] == user1:
-            replies.append(str(df.iloc[j]["message"]))
+            _tmp_replies.append(str(df.iloc[j]["message"]))
             j += 1
+        if _tmp_replies:
+            replies.append(". ".join(_tmp_replies) + ". ")
 
     logger.info("Fetched %d reply candidates: %s", len(replies), replies)
     return replies
