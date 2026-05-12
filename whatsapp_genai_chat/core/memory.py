@@ -1,6 +1,6 @@
 import csv
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -30,4 +30,23 @@ class MemoryStore:
             logger.warning("MemoryStore.append failed", exc_info=True)
 
     def load_recent(self) -> list[dict]:
-        return []
+        if not self.csv_path.exists():
+            return []
+        try:
+            with self.csv_path.open(newline="", encoding="utf-8") as f:
+                rows = list(csv.DictReader(f))
+            if not rows:
+                return []
+            now = datetime.now(timezone.utc)
+            last_ts = datetime.fromisoformat(rows[-1]["timestamp"])
+            if (now - last_ts).total_seconds() > self.window_minutes * 60:
+                self.csv_path.unlink(missing_ok=True)
+                return []
+            cutoff = now.timestamp() - self.window_minutes * 60
+            return [
+                r for r in rows
+                if datetime.fromisoformat(r["timestamp"]).timestamp() >= cutoff
+            ]
+        except Exception:
+            logger.warning("MemoryStore.load_recent failed", exc_info=True)
+            return []
