@@ -10,7 +10,8 @@ def test_append_creates_csv_with_header(tmp_path):
     store.append("hello", "hey!")
 
     assert csv_path.exists()
-    rows = list(csv.DictReader(csv_path.open()))
+    with csv_path.open() as f:
+        rows = list(csv.DictReader(f))
     assert len(rows) == 1
     assert rows[0]["query"] == "hello"
     assert rows[0]["response"] == "hey!"
@@ -23,6 +24,7 @@ def test_append_multiple_rows(tmp_path):
     store.append("q1", "r1")
     store.append("q2", "r2")
 
-    rows = list(csv.DictReader(csv_path.open()))
+    with csv_path.open() as f:
+        rows = list(csv.DictReader(f))
     assert len(rows) == 2
     assert rows[1]["query"] == "q2"
