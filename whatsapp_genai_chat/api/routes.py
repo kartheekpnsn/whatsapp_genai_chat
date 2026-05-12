@@ -74,7 +74,7 @@ def chat(req: ChatRequest):
             f"Pick the most relevant example or combine directly from them.\n\n"
             f"MESSAGE UNDERSTANDING:\n"
             f"- First, understand the content and intent of the incoming message.\n"
-            f"- The message can be in English, Telugu, Tinglish (telugu written in english) or a mix of both. Pay attention to code-switching cues.\n"
+            f"- The message can be in English, Telugu, Tinglish (telugu written inendke  english) or a mix of both. Pay attention to code-switching cues.\n"
             f"- Identify key points, questions, or requests in the message.\n\n"
             f"EMOTIONAL AWARENESS:\n"
             f"- First, detect the emotion in the incoming message (e.g. happy, sad, angry, excited, anxious, "
